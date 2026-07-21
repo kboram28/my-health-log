@@ -1,11 +1,34 @@
+import json
+import os
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 app = FastAPI(title="마이 헬스 로그 API", version="1.0")
 
-# 일단 메모리(리스트)에 저장. Day3에서 파일 저장으로 발전시킬 예정
-records = []
-next_id = 1  # 기록마다 고유 id를 붙이기 위한 카운터
+DATA_FILE = "data.json"
+
+
+# ────────────────────────────────
+# 파일 저장 / 불러오기 함수
+# ────────────────────────────────
+
+def load_records():
+    """서버 시작할 때 data.json이 있으면 불러오고, 없으면 빈 리스트로 시작"""
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+
+def save_records():
+    """현재 records를 data.json에 저장"""
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(records, f, ensure_ascii=False, indent=2)
+
+
+records = load_records()
+# 서버 재시작 시 next_id도 기존 데이터 기준으로 이어서 부여
+next_id = max([r["id"] for r in records], default=0) + 1
 
 
 # 요청 본문 검증용 Pydantic 모델
@@ -26,7 +49,6 @@ class RecordIn(BaseModel):
 # ────────────────────────────────
 
 def calculate_bmi(weight: float, height: float) -> float:
-    """BMI = 몸무게(kg) ÷ (키(m) × 키(m)). 키는 cm로 들어오므로 100으로 나눠서 m로 변환."""
     height_m = height / 100
     bmi = weight / (height_m ** 2)
     return round(bmi, 2)
@@ -73,7 +95,6 @@ def generate_warnings(bmi_category: str, bp_category: str, sugar_category: str) 
 
 
 def enrich_record(record: dict) -> dict:
-    """기록에 bmi, bmi_category, bp_category, sugar_category, warnings를 계산해서 추가"""
     bmi = calculate_bmi(record["weight"], record["height"])
     bmi_category = classify_bmi(bmi)
     bp_category = classify_bp(record["systolic"], record["diastolic"])
@@ -93,7 +114,7 @@ def read_root():
     return {"message": "마이 헬스 로그 API"}
 
 
-# POST /records : 기록 추가 (BMI/분류/경고 자동 계산)
+# POST /records : 기록 추가 (BMI/분류/경고 자동 계산 + 파일 저장)
 @app.post("/records")
 def create_record(record: RecordIn):
     global next_id
@@ -102,6 +123,7 @@ def create_record(record: RecordIn):
     new_record = enrich_record(new_record)
     records.append(new_record)
     next_id += 1
+    save_records()
     return new_record
 
 
@@ -109,6 +131,43 @@ def create_record(record: RecordIn):
 @app.get("/records")
 def get_records():
     return {"count": len(records), "records": records}
+
+
+# GET /search : 날짜 범위(start, end)로 검색
+@app.get("/search")
+def search_records(start: str, end: str):
+    result = [r for r in records if start <= r["date"] <= end]
+    return {"count": len(result), "records": result}
+
+
+# GET /stats : 평균 체중 등 통계 반환
+@app.get("/stats")
+def get_stats():
+    if not records:
+        return {
+            "count": 0,
+            "avg_weight": None,
+            "avg_bmi": None,
+            "avg_systolic": None,
+            "avg_diastolic": None,
+            "avg_blood_sugar": None,
+        }
+
+    count = len(records)
+    avg_weight = round(sum(r["weight"] for r in records) / count, 2)
+    avg_bmi = round(sum(r["bmi"] for r in records) / count, 2)
+    avg_systolic = round(sum(r["systolic"] for r in records) / count, 2)
+    avg_diastolic = round(sum(r["diastolic"] for r in records) / count, 2)
+    avg_blood_sugar = round(sum(r["blood_sugar"] for r in records) / count, 2)
+
+    return {
+        "count": count,
+        "avg_weight": avg_weight,
+        "avg_bmi": avg_bmi,
+        "avg_systolic": avg_systolic,
+        "avg_diastolic": avg_diastolic,
+        "avg_blood_sugar": avg_blood_sugar,
+    }
 
 
 # GET /records/{record_id} : 단건 조회 (없으면 404)
@@ -120,7 +179,7 @@ def get_record(record_id: int):
     raise HTTPException(status_code=404, detail="해당 id의 기록을 찾을 수 없습니다.")
 
 
-# PUT /records/{record_id} : 기록 수정
+# PUT /records/{record_id} : 기록 수정 (+ 파일 저장)
 @app.put("/records/{record_id}")
 def update_record(record_id: int, record: RecordIn):
     for i, r in enumerate(records):
@@ -129,15 +188,17 @@ def update_record(record_id: int, record: RecordIn):
             updated_record["id"] = record_id
             updated_record = enrich_record(updated_record)
             records[i] = updated_record
+            save_records()
             return updated_record
     raise HTTPException(status_code=404, detail="해당 id의 기록을 찾을 수 없습니다.")
 
 
-# DELETE /records/{record_id} : 삭제
+# DELETE /records/{record_id} : 삭제 (+ 파일 저장)
 @app.delete("/records/{record_id}")
 def delete_record(record_id: int):
     for i, r in enumerate(records):
         if r["id"] == record_id:
             deleted = records.pop(i)
+            save_records()
             return {"message": "삭제되었습니다.", "deleted": deleted}
     raise HTTPException(status_code=404, detail="해당 id의 기록을 찾을 수 없습니다.")
