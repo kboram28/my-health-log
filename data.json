@@ -1,0 +1,57 @@
+[
+  {
+    "date": "2026-07-01",
+    "weight": 60.0,
+    "height": 170.0,
+    "systolic": 110,
+    "diastolic": 70,
+    "blood_sugar": 90,
+    "steps": 8000,
+    "sleep_hours": 7.5,
+    "memo": "컨디션 좋음",
+    "id": 1,
+    "bmi": 20.76,
+    "bmi_category": "정상",
+    "bp_category": "정상",
+    "sugar_category": "정상",
+    "warnings": []
+  },
+  {
+    "date": "2026-07-10",
+    "weight": 70.0,
+    "height": 170.0,
+    "systolic": 125,
+    "diastolic": 82,
+    "blood_sugar": 110,
+    "steps": 5000,
+    "sleep_hours": 6.0,
+    "memo": "약간 피곤함",
+    "id": 2,
+    "bmi": 24.22,
+    "bmi_category": "과체중",
+    "bp_category": "주의",
+    "sugar_category": "공복혈당장애",
+    "warnings": []
+  },
+  {
+    "date": "2026-07-20",
+    "weight": 90.0,
+    "height": 170.0,
+    "systolic": 145,
+    "diastolic": 95,
+    "blood_sugar": 130,
+    "steps": 2000,
+    "sleep_hours": 5.0,
+    "memo": "몸이 무거움",
+    "id": 3,
+    "bmi": 31.14,
+    "bmi_category": "비만",
+    "bp_category": "고혈압",
+    "sugar_category": "당뇨 의심",
+    "warnings": [
+      "BMI가 비만 범위입니다. 체중 관리가 필요할 수 있습니다.",
+      "혈압이 고혈압 범위입니다. 전문가 상담을 권장합니다.",
+      "혈당 수치가 당뇨 의심 범위입니다. 전문가 상담을 권장합니다."
+    ]
+  }
+]

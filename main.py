@@ -1,258 +1,123 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 
-from utils import enrich_record
-from models import (RecordIn, UserCreate, UserLogin)
+from models import (RecordIn, UserCreate, UserLogin, Token)
 
 from database import create_tables
 
 from auth import (create_user, authenticate_user)
+from security import create_access_token
+from dependencies import get_current_user
+import records as records_crud
 
 
 app = FastAPI(title="마이 헬스 로그 API", version="1.0")
 
 
-# 서버 실행 시 테이블 생성
 create_tables()
 
 
-# ==================================
-# 기본 API
-# ==================================
-
 @app.get("/")
 def read_root():
-    return {
-        "message": "마이 헬스 로그 API"
-    }
+    return {"message": "마이 헬스 로그 API"}
 
 
-# ==================================
-# 회원가입 / 로그인
-# ==================================
-
-# 회원가입
 @app.post("/auth/signup")
 def signup(user: UserCreate):
-
     result = create_user(
-        username=user.username,
+        email=user.email,
         password=user.password,
         name=user.name
     )
 
     if result is None:
-        raise HTTPException(
-            status_code=400,
-            detail="이미 존재하는 사용자입니다."
-        )
+        raise HTTPException(status_code=400, detail="이미 존재하는 이메일입니다.")
 
-    return {
-        "message": "회원가입 성공",
-        "user": result
-    }
+    return {"message": "회원가입 성공", "user": result}
 
 
-
-# 로그인
 @app.post("/auth/login")
 def login(user: UserLogin):
-
     result = authenticate_user(
-        username=user.username,
+        email=user.email,
         password=user.password
     )
 
     if result is None:
-        raise HTTPException(
-            status_code=401,
-            detail="아이디 또는 비밀번호가 올바르지 않습니다."
-        )
+        raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 올바르지 않습니다.")
+
+    # JWT에는 사용자 id(sub)와 role을 담아 이후 인증/권한 체크에 사용
+    access_token = create_access_token(
+        data={"sub": str(result["id"]), "role": result["role"]}
+    )
 
     return {
         "message": "로그인 성공",
-        "user": result
+        "user": result,
+        "access_token": access_token,
+        "token_type": "bearer"
     }
 
 
-
-# ==================================
-# 건강 기록 API
-# ==================================
-
-# 현재 임시 메모리 저장
-# (나중에 user_id 연결하면서 DB 저장으로 변경)
-records = []
-
-next_id = 1
-
-
-
-# 건강 기록 추가
 @app.post("/records")
-def create_record(record: RecordIn):
-
-    global next_id
-
-
-    new_record = record.model_dump()
-
-    new_record["id"] = next_id
-
-
-    # BMI / 혈압 / 혈당 분석 추가
-    new_record = enrich_record(
-        new_record
-    )
-
-
-    records.append(new_record)
-
-    next_id += 1
-
-
-    return new_record
-
-
-
-# 전체 건강 기록 조회
-@app.get("/records")
-def get_records():
-
-    return {
-        "count": len(records),
-        "records": records
-    }
-
-
-
-# 특정 건강 기록 조회
-@app.get("/records/{record_id}")
-def get_record(record_id: int):
-
-    for record in records:
-
-        if record["id"] == record_id:
-            return record
-
-
-    raise HTTPException(
-        status_code=404,
-        detail="해당 기록을 찾을 수 없습니다."
-    )
-
-
-
-# 건강 기록 수정
-@app.put("/records/{record_id}")
-def update_record(
-    record_id: int,
-    record: RecordIn
+def add_record(
+    record: RecordIn,
+    current_user: dict = Depends(get_current_user)
 ):
-
-    for index, old_record in enumerate(records):
-
-        if old_record["id"] == record_id:
+    saved = records_crud.create_record(current_user["id"], record.model_dump())
+    return {"message": "기록이 추가되었습니다", "record": saved}
 
 
-            updated_record = record.model_dump()
-
-            updated_record["id"] = record_id
-
-
-            updated_record = enrich_record(
-                updated_record
-            )
+@app.get("/records")
+def list_records(current_user: dict = Depends(get_current_user)):
+    items = records_crud.get_records(current_user["id"])
+    return {"count": len(items), "records": items}
 
 
-            records[index] = updated_record
+@app.get("/records/{record_id}")
+def get_record_detail(
+    record_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    record = records_crud.get_record(record_id, current_user["id"])
+    if record is None:
+        raise HTTPException(status_code=404, detail="기록을 찾을 수 없습니다.")
+    return record
 
 
-            return updated_record
+@app.put("/records/{record_id}")
+def update_record_detail(
+    record_id: int,
+    record: RecordIn,
+    current_user: dict = Depends(get_current_user)
+):
+    updated = records_crud.update_record(record_id, current_user["id"], record.model_dump())
+    if updated is None:
+        raise HTTPException(status_code=404, detail="기록을 찾을 수 없습니다.")
+    return {"message": "기록이 수정되었습니다", "record": updated}
 
 
-    raise HTTPException(
-        status_code=404,
-        detail="해당 기록을 찾을 수 없습니다."
-    )
-
-
-
-# 건강 기록 삭제
 @app.delete("/records/{record_id}")
-def delete_record(record_id: int):
-
-    for index, record in enumerate(records):
-
-        if record["id"] == record_id:
-
-            deleted = records.pop(index)
-
-            return {
-                "message": "삭제되었습니다.",
-                "deleted": deleted
-            }
+def delete_record_detail(
+    record_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    deleted = records_crud.delete_record(record_id, current_user["id"])
+    if not deleted:
+        raise HTTPException(status_code=404, detail="기록을 찾을 수 없습니다.")
+    return {"message": "기록이 삭제되었습니다"}
 
 
-    raise HTTPException(
-        status_code=404,
-        detail="해당 기록을 찾을 수 없습니다."
-    )
+@app.get("/search")
+def search_records(
+    start: str,
+    end: str,
+    current_user: dict = Depends(get_current_user)
+):
+    items = records_crud.search_records(current_user["id"], start, end)
+    return {"count": len(items), "records": items}
 
-
-
-# ==================================
-# 통계 API
-# ==================================
 
 @app.get("/stats")
-def get_stats():
-
-    if not records:
-
-        return {
-            "count": 0,
-            "avg_weight": None,
-            "avg_bmi": None,
-            "avg_systolic": None,
-            "avg_diastolic": None,
-            "avg_blood_sugar": None
-        }
-
-
-    count = len(records)
-
-
-    return {
-
-        "count": count,
-
-        "avg_weight":
-            round(
-                sum(r["weight"] for r in records) / count,
-                2
-            ),
-
-        "avg_bmi":
-            round(
-                sum(r["bmi"] for r in records) / count,
-                2
-            ),
-
-        "avg_systolic":
-            round(
-                sum(r["systolic"] for r in records) / count,
-                2
-            ),
-
-        "avg_diastolic":
-            round(
-                sum(r["diastolic"] for r in records) / count,
-                2
-            ),
-
-        "avg_blood_sugar":
-            round(
-                sum(r["blood_sugar"] for r in records) / count,
-                2
-            )
-    }
+def get_stats(current_user: dict = Depends(get_current_user)):
+    print("Current user:", current_user)  # Debugging line  
+    return records_crud.get_stats(current_user["id"])

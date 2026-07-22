@@ -1,7 +1,9 @@
-venv/
+.env
+.env.example
+health.db
 __pycache__/
 *.pyc
-.git/
+.git
 .gitignore
-data.json
-server.log
+venv/
+.venv/

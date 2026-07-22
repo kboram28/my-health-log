@@ -1,47 +1,14 @@
-from passlib.context import CryptContext
 from datetime import datetime
 import sqlite3
 
 from database import get_connection
+from security import hash_password, verify_password
 
 
-# 비밀번호 암호화 설정
-pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto"
-)
-
-
-# ────────────────────────────────
-# 비밀번호 관련 함수
-# ────────────────────────────────
-
-def hash_password(password: str) -> str:
-    """
-    입력받은 비밀번호를 bcrypt로 암호화
-    """
-    return pwd_context.hash(password)
-
-
-def verify_password(
-    plain_password: str,
-    hashed_password: str
-) -> bool:
-    """
-    입력 비밀번호와 DB의 암호화된 비밀번호 비교
-    """
-    return pwd_context.verify(
-        plain_password,
-        hashed_password
-    )
-
-
-# ────────────────────────────────
 # 회원가입
-# ────────────────────────────────
 
 def create_user(
-    username: str,
+    email: str,
     password: str,
     name: str
 ):
@@ -49,15 +16,15 @@ def create_user(
     사용자 회원가입 처리
 
     1. 비밀번호 암호화
-    2. users 테이블 저장
+    2. users 테이블 저장 (role은 기본값 'user'로 고정)
+       -> 관리자 계정은 회원가입 API로 만들 수 없고, 별도로 지정
+          (누구나 회원가입만으로 관리자가 될 수 있으면 안 되기 때문)
     """
 
     conn = get_connection()
     cursor = conn.cursor()
 
-    # 비밀번호 암호화
     hashed_password = hash_password(password)
-
     created_at = datetime.now().isoformat()
 
     try:
@@ -65,15 +32,16 @@ def create_user(
             """
             INSERT INTO users
             (
-                username,
+                email,
                 password,
                 name,
+                role,
                 created_at
             )
-            VALUES (?, ?, ?, ?)
+            VALUES (?, ?, ?, 'user', ?)
             """,
             (
-                username,
+                email,
                 hashed_password,
                 name,
                 created_at
@@ -81,74 +49,93 @@ def create_user(
         )
 
         conn.commit()
-
         user_id = cursor.lastrowid
 
         return {
             "id": user_id,
-            "username": username,
+            "email": email,
             "name": name,
+            "role": "user",
             "created_at": created_at
         }
 
     except sqlite3.IntegrityError:
-        # username UNIQUE 중복
+        # email UNIQUE 중복
         return None
 
     finally:
         conn.close()
 
 
-
-# ────────────────────────────────
 # 로그인
-# ────────────────────────────────
 
 def authenticate_user(
-    username: str,
+    email: str,
     password: str
 ):
     """
     로그인 처리
 
-    1. username으로 사용자 검색
+    1. email로 사용자 검색
     2. 비밀번호 비교
     """
 
     conn = get_connection()
     cursor = conn.cursor()
 
+    cursor.execute(
+        """
+        SELECT *
+        FROM users
+        WHERE email = ?
+        """,
+        (email,)
+    )
+
+    user = cursor.fetchone()
+    conn.close()
+
+    if user is None:
+        return None
+
+    if not verify_password(password, user["password"]):
+        return None
+
+    return {
+        "id": user["id"],
+        "email": user["email"],
+        "name": user["name"],
+        "role": user["role"],
+        "created_at": user["created_at"]
+    }
+
+
+
+# id로 사용자 조회 (JWT 인증 미들웨어에서 사용)
+
+def get_user_by_id(user_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
 
     cursor.execute(
         """
         SELECT *
         FROM users
-        WHERE username = ?
+        WHERE id = ?
         """,
-        (username,)
+        (user_id,)
     )
 
     user = cursor.fetchone()
-
     conn.close()
 
-
-    # 사용자가 없음
     if user is None:
         return None
 
-
-    # 비밀번호 검사
-    if not verify_password(
-        password,
-        user["password"]
-    ):
-        return None
-
-
     return {
         "id": user["id"],
-        "username": user["username"],
+        "email": user["email"],
         "name": user["name"],
+        "role": user["role"],
         "created_at": user["created_at"]
     }

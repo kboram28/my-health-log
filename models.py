@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 
 # 건강 기록 입력
@@ -15,13 +15,20 @@ class RecordIn(BaseModel):
 
 
 # 회원가입 요청
+# username 대신 email을 로그인 아이디로 사용
 class UserCreate(BaseModel):
-    username: str
+    email: EmailStr
     password: str
     name: str
 
 
 # 로그인 요청
 class UserLogin(BaseModel):
-    username: str
+    email: EmailStr
     password: str
+
+
+# 로그인 응답 (JWT)
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
