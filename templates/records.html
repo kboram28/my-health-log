@@ -16,19 +16,19 @@
         <label>날짜</label>
         <input type="date" name="date" value="{{ fv.date or '' }}" required>
         <label>체중 (kg)</label>
-        <input type="number" step="0.1" min="0.1" max="300" name="weight" value="{{ fv.weight or '' }}"
+        <input type="number" step="0.1" min="0.1" max="200" name="weight" value="{{ fv.weight or '' }}"
                onkeydown="preventNegative(event)" oninput="validateNumberInput(this)" required>
         <label>키 (cm)</label>
-        <input type="number" step="0.1" min="0.1" max="250" name="height" value="{{ fv.height or '' }}"
+        <input type="number" step="0.1" min="0.1" max="220" name="height" value="{{ fv.height or '' }}"
                onkeydown="preventNegative(event)" oninput="validateNumberInput(this)" required>
         <label>수축기 혈압</label>
-        <input type="number" min="50" max="300" name="systolic" value="{{ fv.systolic or '' }}"
+        <input type="number" min="0" max="300" name="systolic" value="{{ fv.systolic or '' }}"
                onkeydown="preventNegative(event)" oninput="validateNumberInput(this)" required>
         <label>이완기 혈압</label>
-        <input type="number" min="30" max="200" name="diastolic" value="{{ fv.diastolic or '' }}"
+        <input type="number" min="0" max="200" name="diastolic" value="{{ fv.diastolic or '' }}"
                onkeydown="preventNegative(event)" oninput="validateNumberInput(this)" required>
         <label>공복 혈당</label>
-        <input type="number" min="20" max="600" name="blood_sugar" value="{{ fv.blood_sugar or '' }}"
+        <input type="number" min="0" max="600" name="blood_sugar" value="{{ fv.blood_sugar or '' }}"
                onkeydown="preventNegative(event)" oninput="validateNumberInput(this)" required>
         <label>걸음 수</label>
         <input type="number" min="0" max="100000" name="steps" value="{{ fv.steps if fv.steps is not none else 0 }}"
@@ -44,28 +44,75 @@
 
 <script>
 function preventNegative(e) {
+    // 음수와 지수표기만 막기
     if (e.key === "-" || e.key === "e" || e.key === "E") {
         e.preventDefault();
     }
 }
 
 function validateNumberInput(el) {
-    // 붙여넣기 등으로 들어온 '-' 제거
+
+    // 음수 제거
     el.value = el.value.replace("-", "");
 
-    if (el.value === "") return;
+    // 체중, 키만 소수 첫째 자리 허용
+    if (el.step === "0.1") {
 
-    const max = el.max !== "" ? parseFloat(el.max) : null;
-    if (max === null) return;
+        // 소수점이 여러 개면 하나만 허용
+        let parts = el.value.split(".");
 
-    // 최대값을 넘으면 마지막 자리 제거
-    while (el.value !== "" && parseFloat(el.value) > max) {
-        el.value = el.value.slice(0, -1);
+        if (parts.length > 2) {
+            el.value = parts[0] + "." + parts[1];
+            parts = el.value.split(".");
+        }
+
+        // 소수 첫째 자리까지만
+        if (parts.length === 2) {
+            el.value = parts[0] + "." + parts[1].substring(0, 1);
+        }
+    }
+
+    if (el.value === "") {
+        el.dataset.lastValid = "";
+        return;
+    }
+
+    const value = parseFloat(el.value);
+    const min = parseFloat(el.min);
+    const max = parseFloat(el.max);
+
+    if (value >= min && value <= max) {
+        el.dataset.lastValid = el.value;
+    } else {
+        el.value = el.dataset.lastValid || "";
     }
 }
 
-document.getElementById("record-form").addEventListener("submit", function () {
-    this.querySelectorAll('input[type="number"]').forEach(validateNumberInput);
+document.querySelectorAll('input[type="number"]').forEach(function(el){
+    el.dataset.lastValid = el.value;
+});
+
+document.getElementById("record-form").addEventListener("submit", function (e) {
+
+    let valid = true;
+
+    this.querySelectorAll('input[type="number"]').forEach(function(input) {
+
+        validateNumberInput(input);
+
+        const value = parseFloat(input.value);
+
+        if (isNaN(value) || value < parseFloat(input.min) || value > parseFloat(input.max)) {
+            valid = false;
+        }
+
+    });
+
+    if (!valid) {
+        e.preventDefault();
+        alert("입력값을 확인해주세요.");
+    }
+
 });
 </script>
 
