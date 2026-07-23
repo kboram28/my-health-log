@@ -2,12 +2,13 @@ import json
 
 from database import get_connection
 from utils import enrich_record
-
+from utils import enrich_record, classify_activity
 
 def _row_to_dict(row) -> dict:
     record = dict(row)
     # warnings는 DB에 JSON 문자열로 저장 → 응답 시 리스트로 복원
     record["warnings"] = json.loads(record["warnings"]) if record["warnings"] else []
+    record["activity_level"] = classify_activity(record["steps"])
     return record
 
 

@@ -32,3 +32,9 @@ class UserLogin(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+# 목표 설정 요청 (FR-12)
+class GoalIn(BaseModel):
+    target_weight: float | None = None
+    target_systolic: int | None = None
+    target_diastolic: int | None = None

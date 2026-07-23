@@ -50,5 +50,18 @@ def create_tables():
     )
     """)
 
+    # 목표 테이블 (1인당 1개, user_id에 UNIQUE 제약)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS goals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER UNIQUE NOT NULL,
+        target_weight REAL,
+        target_systolic INTEGER,
+        target_diastolic INTEGER,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(user_id) REFERENCES users(id)
+    )
+    """)
+
     conn.commit()
     conn.close()

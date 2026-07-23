@@ -60,4 +60,14 @@ def enrich_record(record: dict) -> dict:
     record["bp_category"] = bp_category
     record["sugar_category"] = sugar_category
     record["warnings"] = warnings
+    record["activity_level"] = classify_activity(record["steps"])
     return record
+
+def classify_activity(steps: int) -> str:
+    """걸음 수 기준 활동량 등급 (FR-16)"""
+    if steps < 5000:
+        return "부족"
+    elif steps < 10000:
+        return "적정"
+    else:
+        return "우수"
