@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}사용자 기록 - 관리자{% endblock %}
+{% block content %}
+<div class="top-bar">
+    <h1>📋 {{ target_user.name }}님의 기록</h1>
+    <a href="/web/admin">← 대시보드로</a>
+</div>
+
+<div class="card">
+    <p style="color:#666; font-size:13px;">{{ target_user.email }} · 가입일 {{ target_user.created_at[:10] }}</p>
+
+    {% if records|length == 0 %}
+        <p style="color:#888;">이 사용자는 아직 기록이 없습니다.</p>
+    {% else %}
+    <table>
+        <tr>
+            <th>날짜</th><th>체중</th><th>BMI</th><th>혈압</th><th>혈당</th><th>활동</th><th>경고</th><th></th>
+        </tr>
+        {% for r in records %}
+        <tr>
+            <td>{{ r.date }}</td>
+            <td>{{ r.weight }}kg</td>
+            <td>{{ r.bmi }} ({{ r.bmi_category }})</td>
+            <td>
+                {{ r.systolic }}/{{ r.diastolic }}
+                <span class="badge {{ 'warn' if r.bp_category == '고혈압' else 'ok' }}">{{ r.bp_category }}</span>
+            </td>
+            <td>
+                {{ r.blood_sugar }}
+                <span class="badge {{ 'warn' if r.sugar_category == '당뇨 의심' else 'ok' }}">{{ r.sugar_category }}</span>
+            </td>
+            <td>{{ r.activity_level or '-' }}</td>
+            <td>
+                {% for w in r.warnings %}
+                    <div class="error" style="font-size:12px;">⚠ {{ w }}</div>
+                {% endfor %}
+            </td>
+            <td>
+                <form class="inline" method="post"
+                      action="/web/admin/users/{{ target_user.id }}/records/{{ r.id }}/delete"
+                      onsubmit="return confirm('이 사용자의 기록을 삭제하시겠습니까?');">
+                    <button type="submit" class="danger">삭제</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endif %}
+</div>
+{% endblock %}

@@ -9,11 +9,13 @@ import records as records_crud
 import admin as admin_crud
 import goals as goals_crud
 import reports as reports_crud
+from web import router as web_router
 
 
 app = FastAPI(title="마이 헬스 로그 API", version="1.0")
 
 create_tables()
+app.include_router(web_router)
 
 
 @app.get("/")

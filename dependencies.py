@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from auth import get_user_by_id
@@ -52,3 +52,24 @@ def get_current_admin_user(current_user: dict = Depends(get_current_user)) -> di
         raise HTTPException(status_code=403, detail="관리자 권한이 필요합니다.")
 
     return current_user
+
+
+def get_current_user_from_cookie(request: Request):
+    """
+    HTML 화면(웹)용 인증
+    - API처럼 401을 던지지 않고, 실패 시 None을 반환한다.
+      (호출하는 라우트에서 None이면 로그인 페이지로 리다이렉트하도록 처리)
+    """
+    token = request.cookies.get("access_token")
+    if not token:
+        return None
+
+    payload = decode_access_token(token)
+    if payload is None:
+        return None
+
+    user_id = payload.get("sub")
+    if user_id is None:
+        return None
+
+    return get_user_by_id(int(user_id))

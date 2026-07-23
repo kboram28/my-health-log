@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}로그인 - 마이 헬스 로그{% endblock %}
+{% block content %}
+<h1>🩺 마이 헬스 로그</h1>
+<div class="card">
+    <h2>로그인</h2>
+    {% if error %}
+        <p class="error">{{ error }}</p>
+    {% endif %}
+    <form method="post" action="/web/login">
+        <label>이메일</label>
+        <input type="email" name="email" required>
+        <label>비밀번호</label>
+        <input type="password" name="password" required>
+        <button type="submit">로그인</button>
+    </form>
+    <p style="margin-top:16px; font-size:13px; color:#888;">
+        계정이 없으신가요? <a href="/web/signup">회원가입</a>
+    </p>
+</div>
+{% endblock %}

@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}내 기록 - 마이 헬스 로그{% endblock %}
+{% block content %}
+<div class="top-bar">
+    <h1>🩺 {{ user.name }}님의 건강 기록</h1>
+    <a href="/web/logout">로그아웃</a>
+</div>
+
+<div class="card">
+    <h2>기록 추가</h2>
+    {% if error %}
+        <p class="error">⚠ {{ error }}</p>
+    {% endif %}
+    {% set fv = form_values or {} %}
+    <form method="post" action="/web/records" id="record-form">
+        <label>날짜</label>
+        <input type="date" name="date" value="{{ fv.date or '' }}" required>
+        <label>체중 (kg)</label>
+        <input type="number" step="0.1" min="0.1" max="300" name="weight" value="{{ fv.weight or '' }}"
+               onkeydown="preventNegative(event)" oninput="validateNumberInput(this)" required>
+        <label>키 (cm)</label>
+        <input type="number" step="0.1" min="0.1" max="250" name="height" value="{{ fv.height or '' }}"
+               onkeydown="preventNegative(event)" oninput="validateNumberInput(this)" required>
+        <label>수축기 혈압</label>
+        <input type="number" min="50" max="300" name="systolic" value="{{ fv.systolic or '' }}"
+               onkeydown="preventNegative(event)" oninput="validateNumberInput(this)" required>
+        <label>이완기 혈압</label>
+        <input type="number" min="30" max="200" name="diastolic" value="{{ fv.diastolic or '' }}"
+               onkeydown="preventNegative(event)" oninput="validateNumberInput(this)" required>
+        <label>공복 혈당</label>
+        <input type="number" min="20" max="600" name="blood_sugar" value="{{ fv.blood_sugar or '' }}"
+               onkeydown="preventNegative(event)" oninput="validateNumberInput(this)" required>
+        <label>걸음 수</label>
+        <input type="number" min="0" max="100000" name="steps" value="{{ fv.steps if fv.steps is not none else 0 }}"
+               onkeydown="preventNegative(event)" oninput="validateNumberInput(this)">
+        <label>수면 시간</label>
+        <input type="number" step="0.1" min="0" max="24" name="sleep_hours" value="{{ fv.sleep_hours if fv.sleep_hours is not none else 0 }}"
+               onkeydown="preventNegative(event)" oninput="validateNumberInput(this)">
+        <label>메모</label>
+        <input type="text" name="memo" value="{{ fv.memo or '' }}">
+        <button type="submit">저장</button>
+    </form>
+</div>
+
+<script>
+function preventNegative(e) {
+    if (e.key === "-" || e.key === "e" || e.key === "E") {
+        e.preventDefault();
+    }
+}
+
+function validateNumberInput(el) {
+    // 붙여넣기 등으로 들어온 '-' 제거
+    el.value = el.value.replace("-", "");
+
+    if (el.value === "") return;
+
+    const max = el.max !== "" ? parseFloat(el.max) : null;
+    if (max === null) return;
+
+    // 최대값을 넘으면 마지막 자리 제거
+    while (el.value !== "" && parseFloat(el.value) > max) {
+        el.value = el.value.slice(0, -1);
+    }
+}
+
+document.getElementById("record-form").addEventListener("submit", function () {
+    this.querySelectorAll('input[type="number"]').forEach(validateNumberInput);
+});
+</script>
+
+<div class="card">
+    <h2>전체 기록 ({{ records|length }}건)</h2>
+    {% if records|length == 0 %}
+        <p style="color:#888;">아직 기록이 없습니다. 위에서 첫 기록을 추가해보세요.</p>
+    {% else %}
+    <table>
+        <tr>
+            <th>날짜</th><th>체중</th><th>BMI</th><th>혈압</th><th>혈당</th><th>활동</th><th>경고</th><th></th>
+        </tr>
+        {% for r in records %}
+        <tr>
+            <td>{{ r.date }}</td>
+            <td>{{ r.weight }}kg</td>
+            <td>{{ r.bmi }} ({{ r.bmi_category }})</td>
+            <td>
+                {{ r.systolic }}/{{ r.diastolic }}
+                <span class="badge {{ 'warn' if r.bp_category == '고혈압' else 'ok' }}">{{ r.bp_category }}</span>
+            </td>
+            <td>
+                {{ r.blood_sugar }}
+                <span class="badge {{ 'warn' if r.sugar_category == '당뇨 의심' else 'ok' }}">{{ r.sugar_category }}</span>
+            </td>
+            <td>{{ r.activity_level or '-' }}</td>
+            <td>
+                {% for w in r.warnings %}
+                    <div class="error" style="font-size:12px;">⚠ {{ w }}</div>
+                {% endfor %}
+            </td>
+            <td>
+                <form class="inline" method="post" action="/web/records/{{ r.id }}/delete"
+                      onsubmit="return confirm('삭제하시겠습니까?');">
+                    <button type="submit" class="danger">삭제</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endif %}
+</div>
+{% endblock %}

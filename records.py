@@ -1,7 +1,6 @@
 import json
 
 from database import get_connection
-from utils import enrich_record
 from utils import enrich_record, classify_activity
 
 def _row_to_dict(row) -> dict:
