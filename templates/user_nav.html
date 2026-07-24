@@ -1,0 +1,13 @@
+<div class="card" style="padding: 10px 16px; margin-bottom: 16px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <nav class="tab-nav">
+            <a class="tab-link {{ 'active' if active_tab == 'add' else '' }}" href="/web/records/add">➕ 기록 추가</a>
+            <a class="tab-link {{ 'active' if active_tab == 'list' else '' }}" href="/web/records">📋 기록 목록</a>
+            <a class="tab-link {{ 'active' if active_tab == 'dashboard' else '' }}" href="/web/dashboard">📊 대시보드</a>
+            <a class="tab-link {{ 'active' if active_tab == 'calendar' else '' }}" href="/web/calendar">📅 캘린더</a>
+        </nav>
+        <div style="font-size:13px; color:#666;">
+            {{ user.name }}님 · <a href="/web/logout" style="color:#666;">로그아웃</a>
+        </div>
+    </div>
+</div>

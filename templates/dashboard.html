@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}내 대시보드 - 마이 헬스 로그{% endblock %}
+{% block content %}
+{% include "user_nav.html" %}
+
+<div class="card">
+    <h2>전체 요약</h2>
+    {% if stats.count == 0 %}
+        <p style="color:#888;">아직 기록이 없어 통계를 볼 수 없어요. <a href="/web/records/add">기록을 추가</a>해보세요.</p>
+    {% else %}
+    <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <div class="stat-box">
+            <div class="label">평균 체중</div>
+            <div class="value">{{ stats.avg_weight }}kg</div>
+        </div>
+        <div class="stat-box">
+            <div class="label">평균 BMI</div>
+            <div class="value">{{ stats.avg_bmi }}</div>
+        </div>
+        <div class="stat-box">
+            <div class="label">평균 혈압</div>
+            <div class="value">{{ stats.avg_systolic }}/{{ stats.avg_diastolic }}</div>
+        </div>
+        <div class="stat-box">
+            <div class="label">평균 혈당</div>
+            <div class="value">{{ stats.avg_blood_sugar }}</div>
+        </div>
+        <div class="stat-box">
+            <div class="label">총 기록 수</div>
+            <div class="value">{{ stats.count }}건</div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div style="display:flex; gap:16px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:200px;">
+            <h2 style="font-size:15px;">이번 주 vs 지난주</h2>
+            {% if weekly.change is none %}
+                <p style="color:#888; font-size:13px;">{{ weekly.message or "비교할 데이터가 부족해요." }}</p>
+            {% else %}
+                <table style="font-size:13px;">
+                    <tr><td>체중</td><td>{{ '+' if weekly.change.weight > 0 else '' }}{{ weekly.change.weight }}kg</td></tr>
+                    <tr><td>BMI</td><td>{{ '+' if weekly.change.bmi > 0 else '' }}{{ weekly.change.bmi }}</td></tr>
+                    <tr><td>수축기 혈압</td><td>{{ '+' if weekly.change.systolic > 0 else '' }}{{ weekly.change.systolic }}</td></tr>
+                    <tr><td>이완기 혈압</td><td>{{ '+' if weekly.change.diastolic > 0 else '' }}{{ weekly.change.diastolic }}</td></tr>
+                    <tr><td>혈당</td><td>{{ '+' if weekly.change.blood_sugar > 0 else '' }}{{ weekly.change.blood_sugar }}</td></tr>
+                </table>
+            {% endif %}
+        </div>
+        <div style="flex:1; min-width:200px;">
+            <h2 style="font-size:15px;">수면</h2>
+            {% if sleep.status is none %}
+                <p style="color:#888; font-size:13px;">{{ sleep.message or "기록이 없어요." }}</p>
+            {% else %}
+                <p style="font-size:22px; font-weight:bold; margin:4px 0;">{{ sleep.avg_sleep_hours }}시간</p>
+                <span class="badge {{ 'ok' if sleep.status == '적정' else 'warn' }}">{{ sleep.status }}</span>
+                <p style="font-size:12px; color:#888; margin-top:6px;">권장: {{ sleep.recommended_range }}</p>
+            {% endif %}
+        </div>
+        <div style="flex:1; min-width:200px;">
+            <h2 style="font-size:15px;">목표 달성률</h2>
+            {% if not goal_progress.has_goal %}
+                <p style="color:#888; font-size:13px;">아직 목표가 없어요. 아래에서 설정해보세요.</p>
+            {% elif goal_progress.message %}
+                <p style="color:#888; font-size:13px;">{{ goal_progress.message }}</p>
+            {% else %}
+                {% if goal_progress.weight_achievement_percent is defined %}
+                    <p style="font-size:13px;">체중 목표 근접도: <strong>{{ goal_progress.weight_achievement_percent }}%</strong></p>
+                {% endif %}
+                {% if goal_progress.bp_goal_status is defined %}
+                    <p style="font-size:13px;">혈압 목표:
+                        <span class="badge {{ 'ok' if goal_progress.bp_goal_status == '달성' else 'warn' }}">{{ goal_progress.bp_goal_status }}</span>
+                    </p>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if records|length > 0 %}
+<div class="card">
+    <h2>체중 추이</h2>
+    <canvas id="weightChart" height="90"></canvas>
+</div>
+
+<div class="card">
+    <h2>혈압 추이</h2>
+    <canvas id="bpChart" height="90"></canvas>
+</div>
+{% endif %}
+
+<div class="card">
+    <h2>목표 설정</h2>
+    <p style="color:#888; font-size:13px;">비워두면 해당 항목은 목표에서 제외돼요.</p>
+    <form method="post" action="/web/goals">
+        <label>목표 체중 (kg)</label>
+        <input type="number" step="0.1" min="0.1" max="300" name="target_weight"
+               value="{{ goal.target_weight if goal else '' }}">
+        <label>목표 수축기 혈압</label>
+        <input type="number" min="50" max="300" name="target_systolic"
+               value="{{ goal.target_systolic if goal else '' }}">
+        <label>목표 이완기 혈압</label>
+        <input type="number" min="30" max="200" name="target_diastolic"
+               value="{{ goal.target_diastolic if goal else '' }}">
+        <button type="submit">목표 저장</button>
+    </form>
+</div>
+
+{% if records|length > 0 %}
+<script id="records-data" type="application/json">{{ records | tojson }}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+    const records = JSON.parse(document.getElementById('records-data').textContent);
+    const labels = records.map(r => r.date.slice(5));
+
+    new Chart(document.getElementById('weightChart'), {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: '체중(kg)',
+                data: records.map(r => r.weight),
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37,99,235,0.1)',
+                tension: 0.25,
+                fill: true
+            }]
+        },
+        options: { plugins: { legend: { display: false } } }
+    });
+
+    new Chart(document.getElementById('bpChart'), {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: '수축기',
+                    data: records.map(r => r.systolic),
+                    borderColor: '#dc2626',
+                    backgroundColor: 'rgba(220,38,38,0.05)',
+                    tension: 0.25
+                },
+                {
+                    label: '이완기',
+                    data: records.map(r => r.diastolic),
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245,158,11,0.05)',
+                    tension: 0.25
+                }
+            ]
+        },
+        options: { plugins: { legend: { display: true } } }
+    });
+</script>
+{% endif %}
+{% endblock %}

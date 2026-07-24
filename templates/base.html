@@ -40,6 +40,8 @@
         }
         button.danger { background: #dc2626; padding: 4px 10px; font-size: 12px; margin-top: 0; }
         .error { color: #dc2626; font-size: 14px; }
+        .hint { display: none; color: #dc2626; font-size: 12px; margin-top: 2px; }
+        .hint.show { display: block; }
         table { width: 100%; border-collapse: collapse; font-size: 14px; }
         th, td { padding: 8px; border-bottom: 1px solid #eee; text-align: left; }
         .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
@@ -48,6 +50,39 @@
         .top-bar { display: flex; justify-content: space-between; align-items: center; }
         .top-bar a { font-size: 13px; color: #666; text-decoration: none; }
         form.inline { display: inline; }
+        .tab-nav { display: flex; gap: 4px; flex-wrap: wrap; }
+        .tab-link {
+            padding: 8px 14px; border-radius: 6px; text-decoration: none;
+            color: #555; font-size: 14px; white-space: nowrap;
+        }
+        .tab-link:hover { background: #eef2ff; }
+        .tab-link.active { background: #2563eb; color: #fff; }
+        .tab-link.active:hover { background: #2563eb; }
+        .stat-box { background: #eff6ff; border-radius: 8px; padding: 14px; flex: 1; min-width: 130px; }
+        .stat-box .label { font-size: 12px; color: #666; }
+        .stat-box .value { font-size: 22px; font-weight: bold; }
+
+        /* 캘린더 화면 */
+        .calendar-cell {
+            vertical-align: top;
+            height: 64px;
+        }
+        .calendar-cell.today {
+            background: #eff6ff;
+        }
+        .calendar-cell .day-number {
+            font-size: 12px;
+            color: #333;
+        }
+        .calendar-cell.today .day-number {
+            color: #2563eb;
+            font-weight: bold;
+        }
+        .calendar-cell .weight-text {
+            font-size: 11px;
+            color: #666;
+            margin-top: 2px;
+        }
     </style>
 </head>
 <body>

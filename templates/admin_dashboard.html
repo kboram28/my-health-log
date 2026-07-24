@@ -40,7 +40,7 @@
 <div class="card">
     <div style="display:flex; gap:16px; flex-wrap:wrap;">
         <div style="flex:1; min-width:260px;">
-            <h2>사용자별 기록 수</h2>
+            <h2>기록 많은 사용자 TOP 10</h2>
             <canvas id="userChart" height="180"></canvas>
         </div>
         <div style="flex:1; min-width:220px;">
@@ -54,7 +54,14 @@
 </div>
 
 <div class="card">
-    <h2>전체 사용자 ({{ users|length }}명)</h2>
+    <div class="top-bar">
+        <h2>전체 사용자 ({{ total_users }}명)</h2>
+        <form method="get" action="/web/admin" style="display:flex; gap:6px;">
+            <input type="text" name="search" value="{{ search }}" placeholder="이름 또는 이메일 검색"
+                   style="width:200px; margin-top:0;">
+            <button type="submit" style="margin-top:0; padding:8px 14px;">검색</button>
+        </form>
+    </div>
     <table>
         <tr>
             <th>ID</th><th>이름</th><th>이메일</th><th>역할</th><th>가입일</th><th>기록 수</th><th></th>
@@ -71,12 +78,30 @@
             <td>{{ u.record_count }}</td>
             <td><a href="/web/admin/users/{{ u.id }}">기록 보기</a></td>
         </tr>
+        {% else %}
+        <tr><td colspan="7" style="color:#888; text-align:center;">검색 결과가 없습니다.</td></tr>
         {% endfor %}
     </table>
+
+    {% if total_pages > 1 %}
+    <div style="display:flex; justify-content:center; gap:8px; margin-top:16px; align-items:center;">
+        {% if page > 1 %}
+            <a href="/web/admin?page={{ page - 1 }}&search={{ search }}">← 이전</a>
+        {% else %}
+            <span style="color:#ccc;">← 이전</span>
+        {% endif %}
+        <span style="font-size:13px; color:#666;">{{ page }} / {{ total_pages }} 페이지</span>
+        {% if page < total_pages %}
+            <a href="/web/admin?page={{ page + 1 }}&search={{ search }}">다음 →</a>
+        {% else %}
+            <span style="color:#ccc;">다음 →</span>
+        {% endif %}
+    </div>
+    {% endif %}
 </div>
 
 <script id="daily-counts-data" type="application/json">{{ daily_counts | tojson }}</script>
-<script id="users-data" type="application/json">{{ users | tojson }}</script>
+<script id="top-users-data" type="application/json">{{ top_users | tojson }}</script>
 <script id="warning-summary-data" type="application/json">{{ warning_summary | tojson }}</script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
@@ -101,14 +126,14 @@
         }
     });
 
-    const chartUsers = JSON.parse(document.getElementById('users-data').textContent);
+    const topUsers = JSON.parse(document.getElementById('top-users-data').textContent);
     new Chart(document.getElementById('userChart'), {
         type: 'bar',
         data: {
-            labels: chartUsers.map(u => u.name),
+            labels: topUsers.map(u => u.name),
             datasets: [{
                 label: '기록 수',
-                data: chartUsers.map(u => u.record_count),
+                data: topUsers.map(u => u.record_count),
                 backgroundColor: '#2563eb'
             }]
         },

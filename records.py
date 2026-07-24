@@ -159,6 +159,27 @@ def search_records(user_id: int, start: str, end: str) -> list:
     return [_row_to_dict(r) for r in rows]
 
 
+# 특정 연/월의 기록 조회 - 본인 것만 (캘린더 화면용)
+
+def get_records_by_month(user_id: int, year: int, month: int) -> list:
+    start = f"{year:04d}-{month:02d}-01"
+    if month == 12:
+        end = f"{year + 1:04d}-01-01"
+    else:
+        end = f"{year:04d}-{month + 1:02d}-01"
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM records WHERE user_id = ? AND date >= ? AND date < ? ORDER BY date ASC",
+        (user_id, start, end)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [_row_to_dict(r) for r in rows]
+
+
 # 통계 조회 - 본인 것만 (FR-10)
 
 def get_stats(user_id: int):

@@ -4,20 +4,128 @@
 <h1>🩺 마이 헬스 로그</h1>
 <div class="card">
     <h2>회원가입</h2>
-    {% if error %}
-        <p class="error">{{ error }}</p>
-    {% endif %}
-    <form method="post" action="/web/signup">
+    {% if error %}<p class="error">⚠ {{ error }}</p>{% endif %}
+    {% set fv = form_values or {} %}
+    <form method="post" action="/web/signup" id="signup-form" novalidate>
         <label>이름</label>
-        <input type="text" name="name" required>
+        <input type="text" name="name" value="{{ fv.name or '' }}"
+               pattern="^[가-힣]{2,10}$" data-label="이름" required>
+        <div class="hint" id="name-hint">이름은 한글 2~10자만 입력 가능합니다.</div>
+
         <label>이메일</label>
-        <input type="email" name="email" required>
+        <div style="display:flex; gap:8px; align-items:flex-start;">
+            <input type="email" name="email" id="email-input" value="{{ fv.email or '' }}"
+                   style="flex:1;" required>
+            <button type="button" id="check-email-btn" style="margin-top:4px; white-space:nowrap;">중복확인</button>
+        </div>
+        <div class="hint" id="email-hint"></div>
+
         <label>비밀번호 (8자 이상)</label>
-        <input type="password" name="password" minlength="8" required>
+        <input type="password" name="password" id="password-input" minlength="8" required>
+
+        <label>비밀번호 확인</label>
+        <input type="password" name="password_confirm" id="password-confirm-input" minlength="8" required>
+        <div class="hint" id="password-hint">비밀번호가 일치하지 않습니다.</div>
+
+        <label>전화번호</label>
+        <input type="tel" name="phone" value="{{ fv.phone or '' }}"
+               placeholder="010-1234-5678" pattern="^01[016789]-?\d{3,4}-?\d{4}$"
+               data-label="전화번호" required>
+        <div class="hint" id="phone-hint">전화번호 형식이 올바르지 않습니다. (예: 010-1234-5678)</div>
+
         <button type="submit">회원가입</button>
     </form>
-    <p style="margin-top:16px; font-size:13px; color:#888;">
-        이미 계정이 있으신가요? <a href="/web/login">로그인</a>
-    </p>
+    <p style="margin-top:16px; font-size:13px; color:#888;">이미 계정이 있으신가요? <a href="/web/login">로그인</a></p>
 </div>
+
+<script>
+(function () {
+    const form = document.getElementById("signup-form");
+    const emailInput = document.getElementById("email-input");
+    const emailHint = document.getElementById("email-hint");
+    const checkBtn = document.getElementById("check-email-btn");
+    const nameInput = form.querySelector('input[name="name"]');
+    const nameHint = document.getElementById("name-hint");
+    const phoneInput = form.querySelector('input[name="phone"]');
+    const phoneHint = document.getElementById("phone-hint");
+    const pw = document.getElementById("password-input");
+    const pwConfirm = document.getElementById("password-confirm-input");
+    const pwHint = document.getElementById("password-hint");
+
+    let emailChecked = false;
+    let emailCheckedValue = "";
+
+    checkBtn.addEventListener("click", function () {
+        const email = emailInput.value.trim();
+        if (!email) {
+            emailHint.textContent = "이메일을 먼저 입력해주세요.";
+            emailHint.classList.add("show");
+            return;
+        }
+        fetch("/web/check-email?email=" + encodeURIComponent(email))
+            .then(res => res.json())
+            .then(data => {
+                emailCheckedValue = email;
+                if (data.available) {
+                    emailChecked = true;
+                    emailHint.style.color = "#166534";
+                    emailHint.textContent = "사용 가능한 이메일입니다.";
+                } else {
+                    emailChecked = false;
+                    emailHint.style.color = "#dc2626";
+                    emailHint.textContent = "이미 사용 중인 이메일입니다.";
+                }
+                emailHint.classList.add("show");
+            })
+            .catch(() => {
+                emailHint.style.color = "#dc2626";
+                emailHint.textContent = "중복확인 중 오류가 발생했습니다.";
+                emailHint.classList.add("show");
+            });
+    });
+
+    emailInput.addEventListener("input", function () {
+        if (emailInput.value !== emailCheckedValue) {
+            emailChecked = false;
+            emailHint.classList.remove("show");
+        }
+    });
+
+    function validatePattern(el, hintEl) {
+        if (el.value === "") { hintEl.classList.remove("show"); return true; }
+        const ok = new RegExp(el.pattern).test(el.value);
+        hintEl.classList.toggle("show", !ok);
+        return ok;
+    }
+
+    nameInput.addEventListener("blur", () => validatePattern(nameInput, nameHint));
+    phoneInput.addEventListener("blur", () => validatePattern(phoneInput, phoneHint));
+
+    function validatePasswordMatch() {
+        if (pwConfirm.value === "") { pwHint.classList.remove("show"); return true; }
+        const match = pw.value === pwConfirm.value;
+        pwHint.classList.toggle("show", !match);
+        return match;
+    }
+    pw.addEventListener("blur", validatePasswordMatch);
+    pwConfirm.addEventListener("blur", validatePasswordMatch);
+
+    form.addEventListener("submit", function (e) {
+        let ok = true;
+        if (!validatePattern(nameInput, nameHint)) ok = false;
+        if (!validatePattern(phoneInput, phoneHint)) ok = false;
+        if (!validatePasswordMatch()) ok = false;
+        if (!emailChecked || emailInput.value !== emailCheckedValue) {
+            emailHint.style.color = "#dc2626";
+            emailHint.textContent = "이메일 중복확인을 먼저 진행해주세요.";
+            emailHint.classList.add("show");
+            ok = false;
+        }
+        if (!ok) {
+            e.preventDefault();
+            alert("입력값을 확인해주세요.");
+        }
+    });
+})();
+</script>
 {% endblock %}

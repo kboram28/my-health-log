@@ -19,6 +19,7 @@ def create_tables():
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        phone TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
         name TEXT NOT NULL,
@@ -62,6 +63,10 @@ def create_tables():
         FOREIGN KEY(user_id) REFERENCES users(id)
     )
     """)
+
+    # 인덱스: 사용자가 많아져도 "이 사용자의 기록", "이 날짜 범위의 기록" 조회가 느려지지 않도록
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_records_user_id ON records(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_records_date ON records(date)")
 
     conn.commit()
     conn.close()

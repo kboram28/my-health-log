@@ -18,7 +18,7 @@ from database import get_connection, create_tables
 from security import hash_password
 
 
-def seed_admin(email: str, password: str, name: str):
+def seed_admin(email: str, password: str, name: str, phone: str):
     create_tables()
     conn = get_connection()
     cursor = conn.cursor()
@@ -31,10 +31,10 @@ def seed_admin(email: str, password: str, name: str):
 
     cursor.execute(
         """
-        INSERT INTO users (email, password, name, role, created_at)
-        VALUES (?, ?, ?, 'admin', ?)
+        INSERT INTO users (email, password, name, phone, role, created_at)
+        VALUES (?, ?, ?, ?, 'admin', ?)
         """,
-        (email, hash_password(password), name, datetime.now().isoformat())
+        (email, hash_password(password), name, phone, datetime.now().isoformat())
     )
     conn.commit()
     conn.close()
@@ -42,8 +42,8 @@ def seed_admin(email: str, password: str, name: str):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
-        print("사용법: python seed_admin.py <email> <password> <name>")
+    if len(sys.argv) != 5:
+        print("사용법: python seed_admin.py <email> <password> <name> <phone>")
         sys.exit(1)
 
-    seed_admin(sys.argv[1], sys.argv[2], sys.argv[3])
+    seed_admin(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])

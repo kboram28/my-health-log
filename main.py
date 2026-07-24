@@ -1,8 +1,8 @@
 from fastapi import FastAPI, HTTPException, Depends
 
-from models import (RecordIn, UserCreate, UserLogin, Token, GoalIn)
+from models import (RecordIn, UserCreate, UserLogin, Token, GoalIn, AccountDelete)
 from database import create_tables
-from auth import (create_user, authenticate_user)
+from auth import (create_user, authenticate_user, delete_user)
 from security import create_access_token
 from dependencies import get_current_user, get_current_admin_user
 import records as records_crud
@@ -25,7 +25,7 @@ def read_root():
 
 @app.post("/auth/signup")
 def signup(user: UserCreate):
-    result = create_user(email=user.email, password=user.password, name=user.name)
+    result = create_user(email=user.email, password=user.password, name=user.name, phone=user.phone)
     if result is None:
         raise HTTPException(status_code=400, detail="이미 존재하는 이메일입니다.")
     return {"message": "회원가입 성공", "user": result}
@@ -40,6 +40,22 @@ def login(user: UserLogin):
     access_token = create_access_token(data={"sub": str(result["id"]), "role": result["role"]})
 
     return {"message": "로그인 성공", "user": result, "access_token": access_token, "token_type": "bearer"}
+
+
+@app.delete("/auth/me")
+def delete_my_account(body: AccountDelete, current_user: dict = Depends(get_current_user)):
+    """회원 탈퇴 - 비밀번호를 다시 확인한 뒤에만 삭제 (실수 방지)"""
+    verified = authenticate_user(email=current_user["email"], password=body.password)
+    if verified is None:
+        raise HTTPException(status_code=401, detail="비밀번호가 올바르지 않습니다.")
+
+    result = delete_user(current_user["id"])
+    if not result["success"]:
+        if result["reason"] == "last_admin":
+            raise HTTPException(status_code=400, detail="마지막 남은 관리자 계정은 삭제할 수 없습니다.")
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+
+    return {"message": "회원 탈퇴가 완료되었습니다. 그동안 이용해주셔서 감사합니다."}
 
 
 @app.post("/records")
@@ -94,9 +110,13 @@ def get_stats(current_user: dict = Depends(get_current_user)):
 # ==================================
 
 @app.get("/admin/users")
-def admin_list_users(current_admin: dict = Depends(get_current_admin_user)):
-    users = admin_crud.get_all_users()
-    return {"count": len(users), "users": users}
+def admin_list_users(
+    page: int = 1,
+    page_size: int = 20,
+    search: str = "",
+    current_admin: dict = Depends(get_current_admin_user)
+):
+    return admin_crud.get_all_users(page=page, page_size=page_size, search=search)
 
 
 @app.get("/admin/users/{user_id}/records")

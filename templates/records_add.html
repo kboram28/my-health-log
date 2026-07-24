@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}기록 추가 - 마이 헬스 로그{% endblock %}
+{% block content %}
+{% include "user_nav.html" %}
+
+<div class="card">
+    <h2>기록 추가</h2>
+    {% if error %}
+        <p class="error">⚠ {{ error }}</p>
+    {% endif %}
+    {% set fv = form_values or {} %}
+    <form method="post" action="/web/records/add" id="record-form">
+        <label>날짜</label>
+        <input type="date" name="date" value="{{ fv.date or '' }}" max="{{ today }}" required>
+
+        <label>체중 (kg)</label>
+        <input type="number" step="0.1" min="0.1" max="200" id="weight" name="weight"
+               value="{{ fv.weight or '' }}" oninput="clampMax(this)" onblur="checkMin(this)" required>
+        <small class="hint" id="weight-hint"></small>
+
+        <label>키 (cm)</label>
+        <input type="number" step="0.1" min="0.1" max="220" id="height" name="height"
+               value="{{ fv.height or '' }}" oninput="clampMax(this)" onblur="checkMin(this)" required>
+        <small class="hint" id="height-hint"></small>
+
+        <label>수축기 혈압</label>
+        <input type="number" min="50" max="300" id="systolic" name="systolic"
+               value="{{ fv.systolic or '' }}" oninput="clampMax(this)" onblur="checkMin(this)" required>
+        <small class="hint" id="systolic-hint"></small>
+
+        <label>이완기 혈압</label> 
+        <input type="number" min="30" max="200" id="diastolic" name="diastolic"
+               value="{{ fv.diastolic or '' }}" oninput="clampMax(this)" onblur="checkMin(this)" required>
+        <small class="hint" id="diastolic-hint"></small>
+
+        <label>공복 혈당</label>
+        <input type="number" min="20" max="600" id="blood_sugar" name="blood_sugar"
+               value="{{ fv.blood_sugar or '' }}" oninput="clampMax(this)" onblur="checkMin(this)" required>
+        <small class="hint" id="blood_sugar-hint"></small>
+
+        <label>걸음 수</label>
+        <input type="number" min="0" max="100000" id="steps" name="steps"
+               value="{{ fv.steps if fv.steps is not none else 0 }}" oninput="clampMax(this)" onblur="checkMin(this)">
+        <small class="hint" id="steps-hint"></small>
+
+        <label>수면 시간</label>
+        <input type="number" step="0.1" min="0" max="24" id="sleep_hours" name="sleep_hours"
+               value="{{ fv.sleep_hours if fv.sleep_hours is not none else 0 }}" oninput="clampMax(this)" onblur="checkMin(this)">
+        <small class="hint" id="sleep_hours-hint"></small>
+
+        <label>메모</label>
+        <input type="text" name="memo" value="{{ fv.memo or '' }}">
+
+        <button type="submit">저장</button>
+    </form>
+</div>
+
+<script>
+    // 최댓값 / 자릿수: 타이핑하는 매 순간 검사
+    function allowedDecimals(el) {
+        const stepAttr = el.step;
+        if (!stepAttr) return 0;
+        if (stepAttr.includes('.')) return stepAttr.split('.')[1].length;
+        return 0;
+    }
+
+    function clampMax(el) {
+        const raw = el.value;
+        const hint = document.getElementById(el.id + '-hint');
+        const decimals = allowedDecimals(el);
+
+        if (raw.includes('-')) {
+            el.value = el.dataset.lastValid || '';
+            showHint(hint, '0 이상의 값만 입력할 수 있어요.');
+            return;
+        }
+
+        if (decimals === 0 && raw.includes('.')) {
+            el.value = el.dataset.lastValid || '';
+            showHint(hint, '정수만 입력할 수 있어요.');
+            return;
+        }
+
+        if (raw.includes('.')) {
+            const fractional = raw.split('.')[1] || '';
+            if (fractional.length > decimals) {
+                el.value = el.dataset.lastValid || '';
+                showHint(hint, `소수 ${decimals}자리까지만 입력할 수 있어요.`);
+                return;
+            }
+        }
+
+        const intPart = raw.split('.')[0];
+        const maxDigits = String(Math.floor(parseFloat(el.max))).length;
+        if (intPart.length > maxDigits) {
+            el.value = el.dataset.lastValid || '';
+            showHint(hint, `최대 ${el.max}까지만 입력할 수 있어요.`);
+            return;
+        }
+
+        if (raw === '' || raw.endsWith('.')) {
+            el.dataset.lastValid = raw;
+            hideHint(hint);
+            return;
+        }
+
+        const val = parseFloat(raw);
+        if (isNaN(val)) {
+            el.value = el.dataset.lastValid || '';
+            return;
+        }
+
+        const max = el.max !== '' ? parseFloat(el.max) : null;
+        if (max !== null && val > max) {
+            el.value = el.dataset.lastValid || '';
+            showHint(hint, `최대 ${el.max}까지만 입력할 수 있어요.`);
+            return;
+        }
+
+        el.dataset.lastValid = raw;
+        hideHint(hint);
+    }
+
+    // 최솟값: blur 시점 검사
+    function checkMin(el) {
+        const hint = document.getElementById(el.id + '-hint');
+        if (el.value === '') return;
+
+        const val = parseFloat(el.value);
+        const min = el.min !== '' ? parseFloat(el.min) : null;
+
+        if (min !== null && val < min) {
+            showHint(hint, `최소 ${el.min} 이상 입력해야 해요. 값을 다시 입력해주세요.`);
+            el.value = '';
+            el.dataset.lastValid = '';
+            el.focus();
+        }
+    }
+
+    function showHint(hintEl, message) {
+        if (!hintEl) return;
+        hintEl.textContent = '⚠ ' + message;
+        hintEl.classList.add('show');
+    }
+
+    function hideHint(hintEl) {
+        if (!hintEl) return;
+        hintEl.textContent = '';
+        hintEl.classList.remove('show');
+    }
+
+    document.querySelectorAll('#record-form input[type="number"]').forEach(function (el) {
+        el.dataset.lastValid = el.value;
+    });
+
+    document.getElementById('record-form').addEventListener('submit', function () {
+        this.querySelectorAll('input[type="number"]').forEach(clampMax);
+    });
+</script>
+{% endblock %}

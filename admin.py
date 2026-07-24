@@ -5,10 +5,29 @@ from utils import classify_activity
 # 관리자 전용 로직 (FR-19~21)
 # ────────────────────────────────
 
-def get_all_users() -> list:
-    """관리 대상인 일반 사용자 목록 + 각자 기록 개수 (관리자 계정은 제외)"""
+def get_all_users(page: int = 1, page_size: int = 20, search: str = "") -> dict:
+    """
+    관리 대상인 일반 사용자 목록 + 각자 기록 개수 (관리자 계정은 제외)
+    - page/page_size로 페이지네이션 (사용자가 많아져도 한 화면에 다 그리지 않음)
+    - search: 이름 또는 이메일에 포함된 문자열로 필터링
+    """
+    page = max(1, page)
+    offset = (page - 1) * page_size
+    like_pattern = f"%{search}%"
+
     conn = get_connection()
     cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT COUNT(*) as c
+        FROM users u
+        WHERE u.role = 'user' AND (u.name LIKE ? OR u.email LIKE ?)
+        """,
+        (like_pattern, like_pattern)
+    )
+    total = cursor.fetchone()["c"]
+
     cursor.execute(
         """
         SELECT
@@ -16,13 +35,49 @@ def get_all_users() -> list:
             COUNT(r.id) as record_count
         FROM users u
         LEFT JOIN records r ON r.user_id = u.id
-        WHERE u.role = 'user'
+        WHERE u.role = 'user' AND (u.name LIKE ? OR u.email LIKE ?)
         GROUP BY u.id
         ORDER BY u.created_at ASC
-        """
+        LIMIT ? OFFSET ?
+        """,
+        (like_pattern, like_pattern, page_size, offset)
     )
     rows = cursor.fetchall()
     conn.close()
+
+    total_pages = max(1, (total + page_size - 1) // page_size)
+
+    return {
+        "users": [dict(r) for r in rows],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+    }
+
+
+def get_top_users_by_records(limit: int = 10) -> list:
+    """
+    기록이 가장 많은 사용자 상위 N명 (대시보드 막대 그래프용)
+    - 전체 사용자를 다 그래프에 그리면 사용자가 많아질수록 못 알아보게 되므로 상위 N명만
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT u.id, u.name, COUNT(r.id) as record_count
+        FROM users u
+        LEFT JOIN records r ON r.user_id = u.id
+        WHERE u.role = 'user'
+        GROUP BY u.id
+        ORDER BY record_count DESC, u.created_at ASC
+        LIMIT ?
+        """,
+        (limit,)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
     return [dict(r) for r in rows]
 
 

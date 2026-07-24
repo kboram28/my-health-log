@@ -10,17 +10,9 @@ from security import hash_password, verify_password
 def create_user(
     email: str,
     password: str,
-    name: str
+    name: str,
+    phone: str
 ):
-    """
-    사용자 회원가입 처리
-
-    1. 비밀번호 암호화
-    2. users 테이블 저장 (role은 기본값 'user'로 고정)
-       -> 관리자 계정은 회원가입 API로 만들 수 없고, 별도로 지정
-          (누구나 회원가입만으로 관리자가 될 수 있으면 안 되기 때문)
-    """
-
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -35,15 +27,17 @@ def create_user(
                 email,
                 password,
                 name,
+                phone,
                 role,
                 created_at
             )
-            VALUES (?, ?, ?, 'user', ?)
+            VALUES (?, ?, ?, ?, 'user', ?)
             """,
             (
                 email,
                 hashed_password,
                 name,
+                phone,
                 created_at
             )
         )
@@ -55,16 +49,24 @@ def create_user(
             "id": user_id,
             "email": email,
             "name": name,
+            "phone": phone,
             "role": "user",
             "created_at": created_at
         }
 
     except sqlite3.IntegrityError:
-        # email UNIQUE 중복
         return None
 
     finally:
         conn.close()
+
+def email_exists(email: str) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
+    exists = cursor.fetchone() is not None
+    conn.close()
+    return exists
 
 
 # 로그인
@@ -139,3 +141,36 @@ def get_user_by_id(user_id: int):
         "role": user["role"],
         "created_at": user["created_at"]
     }
+
+
+# 회원 탈퇴 (계정 삭제)
+
+def delete_user(user_id: int) -> dict:
+    """
+    계정 삭제
+    - 연관된 records/goals도 함께 삭제 (SQLite는 FK CASCADE를 자동으로 강제하지 않으므로 직접 정리)
+    - 마지막 남은 관리자 계정은 삭제하지 못하게 막음
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT role FROM users WHERE id = ?", (user_id,))
+    row = cursor.fetchone()
+    if row is None:
+        conn.close()
+        return {"success": False, "reason": "not_found"}
+
+    if row["role"] == "admin":
+        cursor.execute("SELECT COUNT(*) as c FROM users WHERE role = 'admin'")
+        admin_count = cursor.fetchone()["c"]
+        if admin_count <= 1:
+            conn.close()
+            return {"success": False, "reason": "last_admin"}
+
+    cursor.execute("DELETE FROM records WHERE user_id = ?", (user_id,))
+    cursor.execute("DELETE FROM goals WHERE user_id = ?", (user_id,))
+    cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+
+    return {"success": True}
